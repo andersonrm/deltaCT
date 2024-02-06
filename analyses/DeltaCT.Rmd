@@ -80,41 +80,6 @@ saumik1 <- read.csv("data/Master Blaster Data.csv", header= TRUE)
 
 
 
-# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-# @@@@@ ggPlot Theme
-# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-
-ggplot.theme <- theme(
-    
-    # Serif fonts to approximate theme_tufte()
-    text = element_text(family = "serif"),
-    
-    # Text size for axis ticks
-    axis.text.y = element_text(size = 14),
-    axis.text.x = element_text(size = 14),
-    
-    # Text size for axis labels
-    # Also move them away from the axes a bit for more space
-    axis.title.x = element_text(size = 18, face = "bold", vjust = -1),
-    axis.title.y = element_text(size = 18, face = "bold", vjust = 1.5),
-    
-    # Plot title size, move away from plot
-    plot.title = element_text(size = 20, face = "bold", vjust = 5),
-    
-    # Margins for top, right, bottom, left
-    plot.margin = grid::unit(c(1.5, 1.5, 1.5, 1.2), "lines"), 
-    
-    # Legend text size
-    legend.text = element_text(size = 14),
-    legend.text.align = 0, 
-    legend.title = element_text(size = 16, face = "bold"),
-    legend.key.size = grid::unit(1.4, "line"),
-    legend.key = element_blank(), 
-    
-    # Facet label text size and background
-    strip.text = element_text(size = 18, face = "bold"),
-    strip.background = element_rect(fill = NA)
-    )
 
 
 ```
@@ -180,13 +145,6 @@ ggplot(x.long, aes(x = resids)) +
   geom_histogram(bins = 15) + 
   facet_wrap(~ gene)
 
-corr.dat <- exp.dat2 %>% 
-  ungroup() %>% 
-  select(Chitenase:lectin) %>% 
-  filter(!is.na())
-
-
-corrplot(as.matrix(corr.dat))
 
 # MANOVA table (response of all genes with pillai index)
 summary(genes.manova)
@@ -208,8 +166,12 @@ genes.lsm <- emmeans(
 
 genes.lsm
 
-genes.cld <- cld(genes.lsm, sort = FALSE, adjust="none", response=TRUE, Letters=c("abcdef"))
-genes.cld$.group=gsub(" ", "", genes.cld$.group)
+genes.cld <- cld(genes.lsm, sort = FALSE,
+                 adjust="none", response=TRUE,
+                 Letters=c("abcdef"))
+
+genes.cld$.group <- gsub(" ", "", genes.cld$.group)
+
 genes.cld
 
 # make cld () parameter estimates into a data.table so dplyer can manipulate
@@ -229,6 +191,7 @@ new.data <- genes.table %>%
 # make a new frame with values plus the values of the controls
 # for example, cemmean is the estimated marginal mean for sham aphids and no weevils
 colnames(new.data) = c("Aphid.Type", "Weevil.Timing", "Gene", "cemmean","cSE","cdf","clower.CL","cupper.CL","c.group")
+
 new.data = new.data %>% dplyr::select(Gene, cemmean)
 
 #left join table now adds control as a new column for finally calculating the second delta in delta delta ct
@@ -256,8 +219,9 @@ f2.table <- subset(final.table, Gene == "ICS1" | Gene == "LOX.2" | Gene == "AOX.
 # make a labeling object to use later in ggplot
 labels.f2 <- c(ICS1 = "ICS1", LOX.2 = "LOX2", AOX.3 = "AO3", GA = "GA2ox")
 
-# use dplyer to reorder so the facets group correctly
+# use dplyr to reorder so the facets group correctly
 neworder <- c("ICS1","AOX.3","LOX.2","GA")
+
 f2.table <- arrange(transform(f2.table,
                               Gene=factor(Gene,levels=neworder)),Gene)
 
@@ -270,12 +234,12 @@ f2a.fig<- ggplot(f2.table, aes(x=factor(Weevil.Timing,levels=c("None","First","S
   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
   #this formatting allows me to insert greek symbols
-  labs(y=expression("Fold Change in Expression ( "~ Delta*Delta~"CT)"), x="Weevil Treatment") + 
+  labs(y=expression("Fold Change in Expression ( 2^"~Delta*Delta~"CT)"), x="Weevil Treatment") + 
   labs(fill="Aphid Type") +
   scale_fill_grey() +
   theme(legend.position="bottom") + #this slaps it down at the bottom
-  theme(axis.line.x = element_line(color="black", size = 0.5),
-        axis.line.y = element_line(color="black", size = 0.5)) +
+  theme(axis.line.x = element_line(color="black", linewidth = 0.5),
+        axis.line.y = element_line(color="black", linewidth = 0.5)) +
   # facetwrap does some silly things so you have to make 2 sets of tukey letters and make one invisible...
   # just... just don't ask.
   geom_text(aes(x = Weevil.Timing, y = upper.SE+(upper.SE*0.2), label = .group), alpha=0, position = position_dodge(width = 0.8)) +
@@ -286,7 +250,7 @@ f2a.fig<- ggplot(f2.table, aes(x=factor(Weevil.Timing,levels=c("None","First","S
   theme(strip.text = element_text(face = "italic"))
 # plotting y on a log scale in ggplot makes error bars less confusing, but it will alter the control to be the axis
 # scale_y_continuous(trans='log10')
-f2a.fig
+f2a.fig + scale_y_continuous(trans = 'log10')
 
 ```
 

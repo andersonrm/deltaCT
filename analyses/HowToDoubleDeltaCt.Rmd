@@ -1,0 +1,236 @@
+---
+title: "How the Double Delta Ct Method Works"
+author: "Riley M. Anderson"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+graphics: yes
+output:
+  github_document:
+    toc: yes
+    toc_depth: 5
+    pandoc_args: --webtex
+  html_document:
+    keep_md: yes
+    theme: readable
+    mathjax: default
+  html_notebook:
+    code_folding: hide
+    theme: readable
+    mathjax: default
+  pdf_document:
+    toc: yes
+header-includes:
+  \usepackage{float}
+  \floatplacement{figure}{H}
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include = F}
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# @@@@@ Knitr Options
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+# Set root directory to the project directory
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+
+
+# Set default knitr options: 
+# Suppress warnings and messages, cache chunks, 
+#  set default figure size to 6x8 at 300 dpi, and save a png and pdf
+knitr::opts_chunk$set(warning = F, message = F, collapse = T, cache = T,
+    fig.height = 6, fig.width = 8, dpi = 300, # 6x8" @ 300dpi:1800x2400=4.3MP
+    dev = c('png', 'pdf'), dev.args = list(pdf = list(onefile = F)))
+
+```
+
+
+```{r Main_Code, include = F, cache = F}
+# Load Packages
+library(knitr)
+```
+
+## Overview
+
+
+## How the $\2^{-\Delta \Delta Ct}$ method works:
+
+Expression of the gene of interest is measured and calibrated to a reference gene.
+
+The $\Delta\Delta Ct$ is the normalized difference in gene expression between a gene of interest in control and treatment conditions:
+
+$$\Delta\Delta Ct = \Delta Ct_{reference.gene} - \Delta Ct_{target.gene}$$
+where,
+$$\Delta Ct_{reference.gene} = (Ct_{control} - Ct_{treatment})_{ref.gene}$$
+and
+$$\Delta Ct_{target.gene} = (Ct_{control} - Ct_{treatment})_{target.gene}$$
+Visually, this table represents the data needed:
+```{r table_demo, echo = F}
+Control <- c("A", "C")
+Treatment <- c("B", "D")
+demo <- data.frame(Control, Treatment)
+rownames(demo) <- c("Reference gene", "Target gene")
+
+kable(demo, format = 'markdown')
+
+```
+
+Where the above formula becomes:
+$$\Delta\Delta Ct = (A - B) - (C - D)$$
+
+Alternatively,
+$$\Delta\Delta Ct = (D - B) - (C - A)$$
+Or if you prefer no parentheses:
+$$\Delta\Delta Ct = A + D - B - C$$
+The above 3 equations are equivalent (this can be useful if your data are organized in different ways).
+
+To understand the intuition behind this method we first need to understand what a Ct, or cycle threshold value actually is.
+
+![Yuan et al. 2006 Fig. 1](./Yuan2006_1.png)
+
+PCR has three phases, an exponential phase, a linear phase, and a plateau phase. PCR product will essentially double with each cycle in the *exponential* phase as reagents are not limited. As reagents become limiting, PCR product will be produced *linearly* with cycle number until some reagents are fully depleted, at which time the PCR product will no longer increase with cycle number, defining the *plateau* phase.
+
+Plotting the PCR product with $log_{2}$ transformation will yield a range where PCR product correlates with the original template amount. 
+
+![Yuan et al. 2006 Fig. 2](./Yuan2006_2.png)
+
+The peak of this range is the transition from the exponential phase to the linear phase which defines the cycle threshold number. 
+
+* Comparing two samples, a higher Ct value means lower expression since it took more PCR cycles to reach the same threshold value of PCR product.
+
+In order for relative quantification of gene expression to be valid, the chosen reference gene needs to have stable expression across treatment conditions. 
+
+That is $\Delta Ct_{reference.gene} \sim 0$ where the expression of the reference gene should only marginally fluctuate across samples and treatments.
+
+* If $\Delta Ct_{reference.gene} = 0$ then,
+
+* A positive $\Delta Ct_{target.gene}$ will result in upregulation:
+
+$$+\Delta Ct_{target} \to -\Delta\Delta Ct \to 2^{-(-\Delta\Delta Ct)} \to FC>1$$
+alternatively, 
+
+
+* A negative $\Delta Ct_{target.gene}$ will result in downregulation:
+
+$$-\Delta Ct_{target} \to +\Delta\Delta Ct \to 2^{-(\Delta\Delta Ct)} \to FC<1$$
+
+## A working example
+
+**Downregulation** is defined by a **higher** Ct value in the treatment condition compared to the control condition. Let's try the calculations with ideal data and with data that have a poor reference gene.
+
+### Proper reference gene:
+
+```{r good_example_table, echo = F}
+
+Control <- c(26.012, 24.149)
+Treatment <- c(26.475, 26.688)
+ex.tab2 <- data.frame(Control, Treatment)
+rownames(ex.tab2) <- c("Reference gene", "Target gene")
+
+A <- 26.012
+B <- 26.475
+C <- 24.149
+D <- 26.688
+
+kable(ex.tab2, format = 'markdown')
+
+```
+
+Our $\Delta Ct_{ref}$ = A - B
+```{r example_good_ref1, echo = F}
+dCt.ref <- A-B
+dCt.ref
+```
+Not bad, pretty close to 0
+
+
+Our $\Delta Ct_{target}$ = C - D
+```{r example_good_ref2, echo = F}
+dCt.target <- C-D
+dCt.target
+```
+Ok, this indicates that our target gene is **downregulated** in the treatment condition.
+
+
+$\Delta\Delta Ct$ <- (A - B) - (C - D)
+
+```{r example_good_ref3, echo = F}
+ddCt <- (A - B) - (C - D)
+ddCt
+```
+Notice that the $\Delta\Delta Ct$ value is **positive**.
+
+Now for the fold change transformation:
+$2^{-(\Delta\Delta Ct)}$ or $2^{-(2.076)}$
+
+```{r example_good_ref4, echo = F}
+2^-ddCt
+```
+Our answer falls between 0 and 1 indicating that the target gene is **downregulated**. This result makes sense given the negative $\Delta Ct_{target}$ value.
+
+
+
+
+### Now, a bad reference gene:
+This example will use the same values as above for the target gene. Only the reference gene has changed.
+
+```{r bad_example_table, echo = F}
+
+Control <- c(21.903, 24.149)
+Treatment <- c(26.475, 26.688)
+ex.tab2 <- data.frame(Control, Treatment)
+rownames(ex.tab2) <- c("Reference gene", "Target gene")
+a <- 21.903
+b <- 26.475
+c <- 24.149
+d <- 26.688
+
+kable(ex.tab2, format = 'markdown')
+
+```
+
+Our $\Delta Ct_{ref}$ = a - b
+```{r example_bad_ref1, echo = F}
+dCt.ref <- a-b
+dCt.ref
+```
+Terrible, our reference gene is not stable.
+
+
+Our $\Delta Ct_{target}$ = c - d
+```{r example_bad_ref2, echo = F}
+dCt.target <- c-d
+dCt.target
+```
+Again, this would indicate that our target gene is **downregulated** in the treatment condition. 
+
+
+$\Delta\Delta Ct$ <- (a - b) - (c - d)
+
+```{r example_bad_ref3, echo = F}
+ddCt <- (a - b) - (c - d)
+ddCt
+```
+Notice that our $\Delta\Delta Ct$ value is now **negative**!
+
+
+Now for the fold change transformation:
+$2^{-(\Delta\Delta Ct)}$ or $2^{-(-2.033)}$
+```{r example_bad_ref4, echo = F}
+2^-ddCt
+```
+Now our answer is much greater than 1 indicating that the target gene is highly **upregulated**! Even slight differences in expression of the reference gene can generate spurious results! Here the direction of the effect is completely reversed and our interpretation of the result would be meaningless. 
+
+
+
+
+## Session Information
+
+```{r Session_Info, echo = F, comment = ""}
+
+# Add session information to help with reproduceability
+sessionInfo()
+
+
+```
+
+
